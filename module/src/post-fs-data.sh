@@ -7,6 +7,18 @@ set -e
 fi
 
 MODDIR=${0%/*}
+
+# INFO: KernelSU 3.3.x applies every module's sepolicy.rule from a single batch during its module
+#         stage, and that batch only partially succeeds ("apply sepolicy batch partially succeeded:
+#         39/86", `Type(zygisk_file) failed: Invalid argument (os error 22)`), so the types declared
+#         here are never created. zygote then cannot open /data/adb nor connect to the control
+#         socket (-EACCES) and no Zygisk module is injected. Replaying the exact same file from
+#         post-fs-data succeeds instead, so do it here before anything gets started.
+if command -v ksud >/dev/null 2>&1 && [ -f "$MODDIR/sepolicy.rule" ]; then
+  log -p i -t "zygisk-sh" "KernelSU: re-applying sepolicy.rule, its boot-time batch is only partial on KSU 3.3.x"
+  ksud sepolicy apply "$MODDIR/sepolicy.rule" >/dev/null 2>&1 || true
+fi
+
 if [ "$ZYGISK_ENABLED" ]; then
   exit 0
 fi
